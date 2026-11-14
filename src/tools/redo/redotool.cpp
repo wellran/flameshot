@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2017-2019 Alejandro Sirgo Rica & Contributors
 
 #include "redotool.h"
+
 #include <QPainter>
 
 RedoTool::RedoTool(QObject* parent)
@@ -23,9 +24,9 @@ QString RedoTool::name() const
     return tr("Redo");
 }
 
-ToolType RedoTool::nameID() const
+CaptureTool::Type RedoTool::type() const
 {
-    return ToolType::REDO;
+    return CaptureTool::TYPE_REDO;
 }
 
 QString RedoTool::description() const
@@ -38,7 +39,7 @@ CaptureTool* RedoTool::copy(QObject* parent)
     return new RedoTool(parent);
 }
 
-void RedoTool::pressed(const CaptureContext& context)
+void RedoTool::pressed(CaptureContext& context)
 {
     Q_UNUSED(context)
     emit requestAction(REQ_REDO_MODIFICATION);

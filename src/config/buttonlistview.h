@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "src/widgets/capture/capturetoolbutton.h"
+#include "widgets/capture/capturetoolbutton.h"
 #include <QListWidget>
 
 class ButtonListView : public QListWidget
@@ -22,8 +22,8 @@ protected:
     void initButtonList();
 
 private:
-    QVector<CaptureToolButton::ButtonType> m_listButtons;
-    QMap<QString, CaptureToolButton::ButtonType> m_buttonTypeByName;
+    QList<CaptureTool::Type> m_listButtons;
+    QMap<QString, CaptureTool::Type> m_buttonTypeByName;
 
     void updateActiveButtons(QListWidgetItem*);
 };

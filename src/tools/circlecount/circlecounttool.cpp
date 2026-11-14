@@ -2,18 +2,22 @@
 // SPDX-FileCopyrightText: 2017-2019 Alejandro Sirgo Rica & Contributors
 
 #include "circlecounttool.h"
-#include "colorutils.h"
+#include "utils/colorutils.h"
+#include "utils/confighandler.h"
+
 #include <QPainter>
-#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_DEBUG
-#include "spdlog/cfg/env.h"
+#include <QPainterPath>
 
 namespace {
 #define PADDING_VALUE 2
 #define THICKNESS_OFFSET 15
+int const MIN_COUNTER = 1;
+int const MAX_COUNTER = 999;
 }
 
 CircleCountTool::CircleCountTool(QObject* parent)
   : AbstractTwoPointTool(parent)
+  , m_valid(false)
 {}
 
 QIcon CircleCountTool::icon(const QColor& background, bool inEditor) const
@@ -24,8 +28,43 @@ QIcon CircleCountTool::icon(const QColor& background, bool inEditor) const
 
 QString CircleCountTool::info()
 {
-    m_tempString = QString("%1 - %2").arg(name()).arg(count());
+    m_tempString = QString("%1 - %2").arg(name(), count());
     return m_tempString;
+}
+
+bool CircleCountTool::isValid() const
+{
+    return m_valid;
+}
+
+QRect CircleCountTool::mousePreviewRect(const CaptureContext& context) const
+{
+    int width = (context.toolSize + THICKNESS_OFFSET) * 2;
+    QRect rect(0, 0, width, width);
+    rect.moveCenter(context.mousePos);
+    return rect;
+}
+
+QRect CircleCountTool::boundingRect() const
+{
+    if (!isValid()) {
+        return {};
+    }
+    int bubble_size = size() + THICKNESS_OFFSET + PADDING_VALUE;
+
+    int line_pos_min_x =
+      std::min(points().first.x() - bubble_size, points().second.x());
+    int line_pos_min_y =
+      std::min(points().first.y() - bubble_size, points().second.y());
+    int line_pos_max_x =
+      std::max(points().first.x() + bubble_size, points().second.x());
+    int line_pos_max_y =
+      std::max(points().first.y() + bubble_size, points().second.y());
+
+    return { line_pos_min_x,
+             line_pos_min_y,
+             line_pos_max_x - line_pos_min_x,
+             line_pos_max_y - line_pos_min_y };
 }
 
 QString CircleCountTool::name() const
@@ -33,9 +72,17 @@ QString CircleCountTool::name() const
     return tr("Circle Counter");
 }
 
-ToolType CircleCountTool::nameID() const
+CaptureTool::Type CircleCountTool::type() const
 {
-    return ToolType::CIRCLECOUNT;
+    return CaptureTool::TYPE_CIRCLECOUNT;
+}
+
+void CircleCountTool::copyParams(const CircleCountTool* from,
+                                 CircleCountTool* to)
+{
+    AbstractTwoPointTool::copyParams(from, to);
+    to->setCount(from->count());
+    to->m_valid = from->m_valid;
 }
 
 QString CircleCountTool::description() const
@@ -63,11 +110,40 @@ void CircleCountTool::process(QPainter& painter, const QPixmap& pixmap)
     QColor antiContrastColor =
       ColorUtils::colorIsDark(color()) ? Qt::black : Qt::white;
 
-    int bubble_size = thickness() + THICKNESS_OFFSET;
-    painter.setPen(contrastColor);
-    painter.setBrush(antiContrastColor);
-    painter.drawEllipse(
-      points().first, bubble_size + PADDING_VALUE, bubble_size + PADDING_VALUE);
+    int bubble_size = size() + THICKNESS_OFFSET;
+
+    QLineF line(points().first, points().second);
+    // if the mouse is outside of the bubble, draw the pointer
+    if (line.length() > bubble_size) {
+        painter.setPen(QPen(color(), 0));
+        painter.setBrush(color());
+
+        int middleX = points().first.x();
+        int middleY = points().first.y();
+
+        QLineF normal = line.normalVector();
+        normal.setLength(bubble_size);
+        QPoint p1 = normal.p2().toPoint();
+        QPoint p2(middleX - (p1.x() - middleX), middleY - (p1.y() - middleY));
+
+        QPainterPath path;
+        path.moveTo(points().first);
+        path.lineTo(p1);
+        path.lineTo(points().second);
+        path.lineTo(p2);
+        path.lineTo(points().first);
+        painter.drawPath(path);
+    }
+
+    if (ConfigHandler().drawCircleCounterOutline()) {
+        painter.setPen(contrastColor);
+        painter.setBrush(antiContrastColor);
+        painter.drawEllipse(points().first,
+                            bubble_size + PADDING_VALUE,
+                            bubble_size + PADDING_VALUE);
+    } else {
+        painter.setPen(Qt::NoPen);
+    }
     painter.setBrush(color());
     painter.drawEllipse(points().first, bubble_size, bubble_size);
     QRect textRect = QRect(points().first.x() - bubble_size / 2,
@@ -99,49 +175,68 @@ void CircleCountTool::process(QPainter& painter, const QPixmap& pixmap)
     // Draw text
     painter.setPen(contrastColor);
     painter.drawText(textRect, Qt::AlignCenter, QString::number(count()));
-
     // restore original font, brush, and pen
     painter.setFont(orig_font);
     painter.setBrush(orig_brush);
     painter.setPen(orig_pen);
 }
 
-void CircleCountTool::drawObjectSelection(QPainter& painter)
-{
-    int bubble_size = thickness() + THICKNESS_OFFSET + PADDING_VALUE;
-    drawObjectSelectionRect(painter,
-                            QRect(points().first.x() - bubble_size,
-                                  points().first.y() - bubble_size,
-                                  bubble_size * 2,
-                                  bubble_size * 2));
-}
-
 void CircleCountTool::paintMousePreview(QPainter& painter,
                                         const CaptureContext& context)
 {
-    thicknessChanged(context.thickness + PADDING_VALUE);
+    onSizeChanged(context.toolSize + PADDING_VALUE);
 
     // Thickness for pen is *2 to range from radius to diameter to match the
     // ellipse draw function
-    auto orig_pen = painter.pen();
-    auto orig_opacity = painter.opacity();
+    auto const previewWidth = (size() + THICKNESS_OFFSET) * 2;
+    painter.save();
     painter.setOpacity(0.35);
-    painter.setPen(QPen(context.color,
-                        (thickness() + THICKNESS_OFFSET) * 2,
-                        Qt::SolidLine,
-                        Qt::RoundCap));
+    painter.setPen(
+      QPen(context.color, previewWidth, Qt::SolidLine, Qt::RoundCap));
     painter.drawLine(context.mousePos,
                      { context.mousePos.x() + 1, context.mousePos.y() + 1 });
-    painter.setOpacity(orig_opacity);
-    painter.setPen(orig_pen);
+
+    auto font = painter.font();
+    font.setPixelSize(previewWidth / 2);
+    font.setBold(true);
+    painter.setFont(font);
+
+    painter.setPen(QPen("white"));
+    painter.drawText(QRect{ context.mousePos.x() - previewWidth / 2,
+                            context.mousePos.y() - previewWidth / 2,
+                            previewWidth,
+                            previewWidth },
+                     Qt::AlignCenter,
+                     QString::number(context.circleCount));
+
+    painter.restore();
+}
+
+bool CircleCountTool::handleMouseWheelEvent(int delta,
+                                            bool adjustmentButtonPressed,
+                                            CaptureContext& ctx)
+{
+    if (adjustmentButtonPressed) {
+        ctx.circleCount =
+          qBound(MIN_COUNTER, ctx.circleCount + delta, MAX_COUNTER);
+    }
+    return adjustmentButtonPressed;
 }
 
 void CircleCountTool::drawStart(const CaptureContext& context)
 {
+    setCount(context.circleCount);
+    // ------------------------------------------------------------------
+    // Temporary solution until the circle count variable removed from
+    // the context altogether and made part of Circle count tool
+    CaptureContext& ctx = const_cast<CaptureContext&>(context);
+    ctx.circleCount = qBound(MIN_COUNTER, ctx.circleCount + 1, MAX_COUNTER);
+    // ------------------------------------------------------------------
     AbstractTwoPointTool::drawStart(context);
+    m_valid = true;
 }
 
-void CircleCountTool::pressed(const CaptureContext& context)
+void CircleCountTool::pressed(CaptureContext& context)
 {
     Q_UNUSED(context)
 }

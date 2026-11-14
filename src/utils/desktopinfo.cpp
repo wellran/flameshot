@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2017-2019 Alejandro Sirgo Rica & Contributors
 
 #include "desktopinfo.h"
+
 #include <QProcessEnvironment>
 
 DesktopInfo::DesktopInfo()
@@ -16,7 +17,7 @@ DesktopInfo::DesktopInfo()
     DESKTOP_SESSION = e.value(QStringLiteral("DESKTOP_SESSION"));
 }
 
-bool DesktopInfo::waylandDectected()
+bool DesktopInfo::waylandDetected()
 {
     return XDG_SESSION_TYPE == QLatin1String("wayland") ||
            WAYLAND_DISPLAY.contains(QLatin1String("wayland"),
@@ -31,11 +32,21 @@ DesktopInfo::WM DesktopInfo::windowManager()
         if (desktop.contains(QLatin1String("GNOME"), Qt::CaseInsensitive)) {
             return DesktopInfo::GNOME;
         }
-        if (desktop.contains(QLatin1String("sway"), Qt::CaseInsensitive)) {
-            return DesktopInfo::SWAY;
+        if (desktop.contains(QLatin1String("qtile"), Qt::CaseInsensitive)) {
+            return DesktopInfo::QTILE;
+        }
+        if (desktop.contains(QLatin1String("sway"), Qt::CaseInsensitive) ||
+            desktop.contains(QLatin1String("river"), Qt::CaseInsensitive)) {
+            return DesktopInfo::WLROOTS;
+        }
+        if (desktop.contains(QLatin1String("Hyprland"), Qt::CaseInsensitive)) {
+            return DesktopInfo::HYPRLAND;
         }
         if (desktop.contains(QLatin1String("kde-plasma"))) {
             return DesktopInfo::KDE;
+        }
+        if (desktop.contains(QLatin1String("cosmic"), Qt::CaseInsensitive)) {
+            return DesktopInfo::COSMIC;
         }
     }
 

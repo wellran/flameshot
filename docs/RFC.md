@@ -33,14 +33,14 @@ project is evolving in.
 [When you need to follow this process]: #when-you-need-to-follow-this-process
 
 You need to follow this process if you intend to make "substantial" changes to
-flameshot or the RFC process itself. What constitutes a
+Flameshot or the RFC process itself. What constitutes a
 "substantial" change is evolving based on community norms and varies depending
 on what part of the ecosystem you are proposing to change, but may include the
 following.
 
   + Any changes breaking compatibility to command line flags or config files.
   + Any major changes to the UI
-  + Substantial new features like new tools. 
+  + Substantial new features like new tools.
 
 Some changes do not require an RFC:
 
@@ -48,12 +48,12 @@ Some changes do not require an RFC:
 
     not change meaning".
 
-  + Improving translations. 
+  + Improving translations.
   + Additions that strictly improve objective, numerical quality criteria
 
     (warning removal, speedup, better platform coverage, etc.)
 
-  + Additions only likely to be _noticed by_ other developers-of-flameshot, 
+  + Additions only likely to be _noticed by_ other developers-of-flameshot,
 
     invisible to users-of-flameshot.
 
@@ -76,7 +76,7 @@ beforehand, to ascertain that the RFC may be desirable; having a consistent
 impact on the project requires concerted effort toward consensus-building.
 
 The most common preparations for writing and submitting an RFC include talking
-the idea over on our [official Slack server](flameshotworkspace.slack.com) or opening an issue on github for discussion. 
+the idea over on our [official Matrix Space](https://matrix.to/#/#flameshot-org:matrix.org) in the [Developers](https://matrix.to/#/!AYbNXDGTDwApLwzkNg:feneas.org?via=kde.org&via=matrix.org&via=ryan77627.xyz), or opening an issue on [Github Discussions](https://github.com/flameshot-org/flameshot/discussions).
 
 ## What the process is
 
@@ -86,7 +86,7 @@ In short, to get a major feature added to Flameshot, one must first get the RFC
 merged into the RFC repository as a markdown file. At that point the RFC is
 "active" and may be implemented with the goal of eventual inclusion into Flameshot.
 
-  + Fork the Flameshot repo 
+  + Fork the Flameshot repo
   + Copy `docs/0000-template.md` to `docs/RFC/0000-my-feature.md` (where "my-feature" is
 
     descriptive). Don't assign an RFC number yet; This is going to be the PR
@@ -170,15 +170,15 @@ next major release.
 In general, once accepted, RFCs should not be substantially changed. Only very
 minor changes should be submitted as amendments. More substantial changes
 should be new RFCs, with a note added to the original RFC. Exactly what counts
-as a "very minor change" is up to the development team. 
+as a "very minor change" is up to the development team.
 
- 
+
 
 ## Reviewing RFCs
 
 [Reviewing RFCs]: #reviewing-rfcs
 
-The preferred method of discussing RFC's is the github issue. However, the development team may schedule meetings with the
+The preferred method of discussing RFC's is the Github issue. However, the development team may schedule meetings with the
 author and/or relevant stakeholders to discuss the issues in greater detail. In either
 case a summary from the meeting will be posted back to the RFC pull request.
 
@@ -216,11 +216,11 @@ Some RFC pull requests are tagged with the "postponed" label when they are
 closed (as part of the rejection process). An RFC closed with "postponed" is
 marked as such because we want neither to think about evaluating the proposal
 nor about implementing the described feature until some time in the future, and
-we believe that we can afford to wait until then to do so. 
+we believe that we can afford to wait until then to do so.
 
 Usually an RFC pull request marked as "postponed" has already passed an
 informal first round of evaluation, namely the round of "do we think we would
-ever possibly consider making this change, as outlined in the RFC pull request, 
+ever possibly consider making this change, as outlined in the RFC pull request,
 or some semi-obvious variation of it." (When the answer to the latter question
 is "no", then the appropriate response is to close the RFC, not postpone it.)
 

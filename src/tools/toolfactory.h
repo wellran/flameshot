@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "src/tools/capturetool.h"
-#include "src/widgets/capture/capturetoolbutton.h"
+#include "tools/capturetool.h"
+
 #include <QObject>
 
 class CaptureTool;
@@ -19,6 +19,5 @@ public:
     ToolFactory(const ToolFactory&) = delete;
     ToolFactory& operator=(const ToolFactory&) = delete;
 
-    CaptureTool* CreateTool(CaptureToolButton::ButtonType t,
-                            QObject* parent = nullptr);
+    CaptureTool* CreateTool(CaptureTool::Type t, QObject* parent = nullptr);
 };

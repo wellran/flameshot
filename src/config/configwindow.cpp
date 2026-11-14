@@ -2,65 +2,93 @@
 // SPDX-FileCopyrightText: 2017-2019 Alejandro Sirgo Rica & Contributors
 
 #include "configwindow.h"
-#include "src/config/filenameeditor.h"
-#include "src/config/generalconf.h"
-#include "src/config/shortcutswidget.h"
-#include "src/config/strftimechooserwidget.h"
-#include "src/config/visualseditor.h"
-#include "src/utils/colorutils.h"
-#include "src/utils/confighandler.h"
-#include "src/utils/globalvalues.h"
-#include "src/utils/pathinfo.h"
+#include "config/configresolver.h"
+#include "config/filenameeditor.h"
+#include "config/generalconf.h"
+#include "config/shortcutswidget.h"
+#include "config/visualseditor.h"
+#include "utils/colorutils.h"
+#include "utils/confighandler.h"
+#include "utils/globalvalues.h"
+#include "utils/pathinfo.h"
+
+#include <QApplication>
+#include <QDialogButtonBox>
 #include <QFileSystemWatcher>
 #include <QIcon>
 #include <QKeyEvent>
+#include <QLabel>
+#include <QSizePolicy>
+#include <QTabBar>
+#include <QTextStream>
 #include <QVBoxLayout>
 
 // ConfigWindow contains the menus where you can configure the application
 
 ConfigWindow::ConfigWindow(QWidget* parent)
-  : QTabWidget(parent)
+  : QWidget(parent)
 {
+    // We wrap QTabWidget in a QWidget because of a Qt bug
+    auto* layout = new QVBoxLayout(this);
+    m_tabWidget = new QTabWidget(this);
+    m_tabWidget->tabBar()->setUsesScrollButtons(false);
+#if defined(Q_OS_MACOS)
+    // Fix Qt6 macOS bug where tab pane content renders behind the tab bar
+    m_tabWidget->setStyleSheet(
+      "QTabWidget::pane { border-top: 2px solid palette(mid); }");
+#endif
+    layout->addWidget(m_tabWidget);
+
     setAttribute(Qt::WA_DeleteOnClose);
-    setMinimumSize(GlobalValues::buttonBaseSize() * 15,
-                   GlobalValues::buttonBaseSize() * 18);
-    setWindowIcon(QIcon(":img/app/flameshot.svg"));
+    setWindowIcon(QIcon(GlobalValues::iconPath()));
     setWindowTitle(tr("Configuration"));
 
-    auto changedSlot = [this](QString s) {
-        QStringList files = m_configWatcher->files();
-        if (!files.contains(s)) {
-            this->m_configWatcher->addPath(s);
-        }
-        emit updateChildren();
-    };
-    m_configWatcher = new QFileSystemWatcher(this);
-    m_configWatcher->addPath(ConfigHandler().configFilePath());
-    connect(
-      m_configWatcher, &QFileSystemWatcher::fileChanged, this, changedSlot);
+    connect(ConfigHandler::getInstance(),
+            &ConfigHandler::fileChanged,
+            this,
+            &ConfigWindow::updateChildren);
 
     QColor background = this->palette().window().color();
     bool isDark = ColorUtils::colorIsDark(background);
     QString modifier =
       isDark ? PathInfo::whiteIconPath() : PathInfo::blackIconPath();
 
+    // general
+    m_generalConfig = new GeneralConf();
+    m_generalConfigTab = new QWidget();
+    auto* generalConfigLayout = new QVBoxLayout(m_generalConfigTab);
+    m_generalConfigTab->setLayout(generalConfigLayout);
+    generalConfigLayout->addWidget(m_generalConfig);
+    m_tabWidget->addTab(
+      m_generalConfigTab, QIcon(modifier + "config.svg"), tr("General"));
+
     // visuals
     m_visuals = new VisualsEditor();
-    addTab(m_visuals, QIcon(modifier + "graphics.svg"), tr("Interface"));
+    m_visualsTab = new QWidget();
+    auto* visualsLayout = new QVBoxLayout(m_visualsTab);
+    m_visualsTab->setLayout(visualsLayout);
+    visualsLayout->addWidget(m_visuals);
+    m_tabWidget->addTab(
+      m_visualsTab, QIcon(modifier + "graphics.svg"), tr("Interface"));
 
     // filename
     m_filenameEditor = new FileNameEditor();
-    addTab(m_filenameEditor,
-           QIcon(modifier + "name_edition.svg"),
-           tr("Filename Editor"));
-
-    // general
-    m_generalConfig = new GeneralConf();
-    addTab(m_generalConfig, QIcon(modifier + "config.svg"), tr("General"));
+    m_filenameEditorTab = new QWidget();
+    auto* filenameEditorLayout = new QVBoxLayout(m_filenameEditorTab);
+    m_filenameEditorTab->setLayout(filenameEditorLayout);
+    filenameEditorLayout->addWidget(m_filenameEditor);
+    m_tabWidget->addTab(m_filenameEditorTab,
+                        QIcon(modifier + "name_edition.svg"),
+                        tr("Filename Editor"));
 
     // shortcuts
     m_shortcuts = new ShortcutsWidget();
-    addTab(m_shortcuts, QIcon(modifier + "shortcut.svg"), tr("Shortcuts"));
+    m_shortcutsTab = new QWidget();
+    auto* shortcutsLayout = new QVBoxLayout(m_shortcutsTab);
+    m_shortcutsTab->setLayout(shortcutsLayout);
+    shortcutsLayout->addWidget(m_shortcuts);
+    m_tabWidget->addTab(
+      m_shortcutsTab, QIcon(modifier + "shortcut.svg"), tr("Shortcuts"));
 
     // connect update sigslots
     connect(this,
@@ -75,6 +103,12 @@ ConfigWindow::ConfigWindow(QWidget* parent)
             &ConfigWindow::updateChildren,
             m_generalConfig,
             &GeneralConf::updateComponents);
+
+    // Error indicator (this must come last)
+    initErrorIndicator(m_visualsTab, m_visuals);
+    initErrorIndicator(m_filenameEditorTab, m_filenameEditor);
+    initErrorIndicator(m_generalConfigTab, m_generalConfig);
+    initErrorIndicator(m_shortcutsTab, m_shortcuts);
 }
 
 void ConfigWindow::keyPressEvent(QKeyEvent* e)
@@ -82,4 +116,54 @@ void ConfigWindow::keyPressEvent(QKeyEvent* e)
     if (e->key() == Qt::Key_Escape) {
         close();
     }
+}
+
+void ConfigWindow::initErrorIndicator(QWidget* tab, QWidget* widget)
+{
+    auto* label = new QLabel(tab);
+    auto* btnResolve = new QPushButton(tr("Resolve"), tab);
+    auto* btnLayout = new QHBoxLayout();
+
+    // Set up label
+    label->setText(tr(
+      "<b>Configuration file has errors. Resolve them before continuing.</b>"));
+    label->setStyleSheet(QStringLiteral(":disabled { color: %1; }")
+                           .arg(qApp->palette().color(QPalette::Text).name()));
+    label->setVisible(ConfigHandler().hasError());
+
+    // Set up "Show errors" button
+    btnResolve->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
+    btnLayout->addWidget(btnResolve);
+    btnResolve->setVisible(ConfigHandler().hasError());
+
+    widget->setEnabled(!ConfigHandler().hasError());
+
+    // Add label and button to the parent widget's layout
+    auto* layout = static_cast<QBoxLayout*>(tab->layout());
+    if (layout != nullptr) {
+        layout->insertWidget(0, label);
+        layout->insertLayout(1, btnLayout);
+    } else {
+        widget->layout()->addWidget(label);
+        widget->layout()->addWidget(btnResolve);
+    }
+
+    // Sigslots
+    connect(
+      ConfigHandler::getInstance(), &ConfigHandler::error, widget, [=, this]() {
+          widget->setEnabled(false);
+          label->show();
+          btnResolve->show();
+      });
+    connect(ConfigHandler::getInstance(),
+            &ConfigHandler::errorResolved,
+            widget,
+            [=]() {
+                widget->setEnabled(true);
+                label->hide();
+                btnResolve->hide();
+            });
+    connect(btnResolve, &QPushButton::clicked, this, [this]() {
+        ConfigResolver().exec();
+    });
 }

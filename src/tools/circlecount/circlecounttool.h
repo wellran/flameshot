@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "src/tools/abstracttwopointtool.h"
+#include "tools/abstracttwopointtool.h"
 
 class CircleCountTool : public AbstractTwoPointTool
 {
@@ -15,20 +15,26 @@ public:
     QString name() const override;
     QString description() const override;
     QString info() override;
+    bool isValid() const override;
+
+    QRect mousePreviewRect(const CaptureContext& context) const override;
+    QRect boundingRect() const override;
 
     CaptureTool* copy(QObject* parent = nullptr) override;
     void process(QPainter& painter, const QPixmap& pixmap) override;
-    void drawObjectSelection(QPainter& painter) override;
     void paintMousePreview(QPainter& painter,
                            const CaptureContext& context) override;
+    bool handleMouseWheelEvent(int, bool, CaptureContext& ctx) override;
 
 protected:
-    ToolType nameID() const override;
+    CaptureTool::Type type() const override;
+    void copyParams(const CircleCountTool* from, CircleCountTool* to);
 
 public slots:
     void drawStart(const CaptureContext& context) override;
-    void pressed(const CaptureContext& context) override;
+    void pressed(CaptureContext& context) override;
 
 private:
     QString m_tempString;
+    bool m_valid;
 };

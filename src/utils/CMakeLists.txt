@@ -1,30 +1,44 @@
 # Required to generate MOC
 target_sources(
   flameshot
-  PRIVATE dbusutils.h
+  PRIVATE abstractlogger.h
           filenamehandler.h
           screengrabber.h
           systemnotification.h
-          configshortcuts.h
-          request.h
+          valuehandler.h
           strfparse.h
 )
 
 target_sources(
   flameshot
-  PRIVATE filenamehandler.cpp
+  PRIVATE abstractlogger.cpp
+          filenamehandler.cpp
           screengrabber.cpp
+          monitorpreview.cpp
           confighandler.cpp
           systemnotification.cpp
+          valuehandler.cpp
           screenshotsaver.cpp
-          dbusutils.cpp
           globalvalues.cpp
           desktopfileparse.cpp
           desktopinfo.cpp
           pathinfo.cpp
           colorutils.cpp
           history.cpp
-          configshortcuts.cpp
           strfparse.cpp
-        request.cpp
 )
+
+IF (UNIX AND NOT APPLE)
+target_sources(
+  flameshot
+  PRIVATE request.h
+          request.cpp
+)
+ENDIF()
+
+IF (WIN32)
+  target_sources(
+    flameshot
+    PRIVATE winlnkfileparse.cpp
+  )
+ENDIF()

@@ -3,6 +3,7 @@
 
 #include "capturecontext.h"
 
+// TODO rename
 QPixmap CaptureContext::selectedScreenshotArea() const
 {
     if (selection.isNull()) {

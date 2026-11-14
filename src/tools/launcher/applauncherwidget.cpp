@@ -2,14 +2,16 @@
 // SPDX-FileCopyrightText: 2017-2019 Alejandro Sirgo Rica & Contributors
 
 #include "applauncherwidget.h"
-#include "src/tools/launcher/launcheritemdelegate.h"
-#include "src/utils/confighandler.h"
-#include "src/utils/filenamehandler.h"
-#include "src/utils/globalvalues.h"
-#include "terminallauncher.h"
+#include "tools/launcher/launcheritemdelegate.h"
+#include "tools/launcher/terminallauncher.h"
+#include "utils/confighandler.h"
+#include "utils/filenamehandler.h"
+#include "utils/globalvalues.h"
+
 #include <QCheckBox>
 #include <QDir>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLineEdit>
 #include <QList>
 #include <QListView>
@@ -17,10 +19,18 @@
 #include <QMessageBox>
 #include <QPixmap>
 #include <QProcess>
+#include <QRegularExpression>
+#include <QStandardPaths>
 #include <QTabWidget>
+#include <QTemporaryFile>
 
 namespace {
 
+#if defined(Q_OS_WIN)
+QMap<QString, QString> catIconNames({ { "Graphics", "image.svg" },
+                                      { "Utility", "apps.svg" } });
+}
+#else
 QMap<QString, QString> catIconNames(
   { { "Multimedia", "applications-multimedia" },
     { "Development", "applications-development" },
@@ -32,31 +42,46 @@ QMap<QString, QString> catIconNames(
     { "System", "preferences-system" },
     { "Utility", "applications-utilities" } });
 }
+#endif
 
 AppLauncherWidget::AppLauncherWidget(const QPixmap& p, QWidget* parent)
   : QWidget(parent)
   , m_pixmap(p)
 {
     setAttribute(Qt::WA_DeleteOnClose);
-    setWindowIcon(QIcon(":img/app/flameshot.svg"));
+    setWindowIcon(QIcon(GlobalValues::iconPath()));
     setWindowTitle(tr("Open With"));
 
-    m_keepOpen = ConfigHandler().keepOpenAppLauncherValue();
+    m_keepOpen = ConfigHandler().keepOpenAppLauncher();
 
-    QString dirLocal = QDir::homePath() + "/.local/share/applications/";
-    QDir appsDirLocal(dirLocal);
-    m_parser.processDirectory(appsDirLocal);
+#if defined(Q_OS_WIN)
+    QDir userAppsFolder(
+      QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation)
+        .at(0));
+    m_parser.processDirectory(userAppsFolder);
 
-    QString dir = QStringLiteral("/usr/share/applications/");
-    QDir appsDir(dir);
-    m_parser.processDirectory(appsDir);
+    QString dir(m_parser.getAllUsersStartMenuPath());
+    if (!dir.isEmpty()) {
+        QDir allUserAppsFolder(dir);
+        m_parser.processDirectory(allUserAppsFolder);
+    }
+#else
+    QStringList appsLocations =
+      QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation);
+
+    for (const auto& appsLocation : appsLocations) {
+        QDir appsDir(appsLocation);
+        m_parser.processDirectory(QDir(appsDir));
+    }
+
+#endif
 
     initAppMap();
     initListWidget();
 
     m_terminalCheckbox = new QCheckBox(tr("Launch in terminal"), this);
     m_keepOpenCheckbox = new QCheckBox(tr("Keep open after selection"), this);
-    m_keepOpenCheckbox->setChecked(ConfigHandler().keepOpenAppLauncherValue());
+    m_keepOpenCheckbox->setChecked(ConfigHandler().keepOpenAppLauncher());
     connect(m_keepOpenCheckbox,
             &QCheckBox::clicked,
             this,
@@ -85,31 +110,65 @@ AppLauncherWidget::AppLauncherWidget(const QPixmap& p, QWidget* parent)
 
 void AppLauncherWidget::launch(const QModelIndex& index)
 {
-    if (!QFileInfo(m_tempFile).isReadable()) {
-        m_tempFile =
-          FileNameHandler().generateAbsolutePath(QDir::tempPath()) + ".png";
-        bool ok = m_pixmap.save(m_tempFile);
+    if (!m_tempFile || !QFileInfo(m_tempFile->fileName()).isReadable()) {
+        delete m_tempFile;
+        // _XXXXXX is how Qt temporary files are mocked before substitution
+        m_tempFile = new QTemporaryFile(QDir::tempPath() + "/" +
+                                          FileNameHandler().parsedPattern() +
+                                          "_XXXXXX.png",
+                                        this);
+        m_tempFile->setAutoRemove(false);
+        if (!m_tempFile->open()) {
+            QMessageBox::about(
+              this, tr("Error"), tr("Unable to write in") + QDir::tempPath());
+            return;
+        }
+        m_tempFile->close();
+        bool ok = m_pixmap.save(m_tempFile->fileName());
         if (!ok) {
             QMessageBox::about(
               this, tr("Error"), tr("Unable to write in") + QDir::tempPath());
             return;
         }
     }
-    QString command = index.data(Qt::UserRole)
-                        .toString()
-                        .replace(QRegExp("(\\%.)"), '"' + m_tempFile + '"');
-
-    QString app_name = index.data(Qt::UserRole).toString().split(" ").at(0);
+    // Heuristically, if there is a % in the command we assume it is the file
+    // name slot
+    QString command = index.data(Qt::UserRole).toString();
+    const QString tempFilePath = m_tempFile->fileName();
+#if defined(Q_OS_WIN)
+    // Do not split on Windows, since file path can contain spaces
+    // and % is not used in lnk files
+    QStringList prog_args;
+    prog_args << command;
+#else
+    QStringList prog_args = QProcess::splitCommand(command);
+#endif
+    // no quotes because it is going in an array!
+    static const QRegularExpression regexp("(\\%.)");
+    if (command.contains("%")) {
+        // but that means we need to substitute IN the array not the string!
+        for (auto& i : prog_args) {
+            if (i.contains("%"))
+                i.replace(regexp, tempFilePath);
+        }
+    } else {
+        // we really should append the file name if there
+        prog_args.append(tempFilePath); // were no replacements
+    }
+    QString app_name = prog_args.at(0);
     bool inTerminal =
       index.data(Qt::UserRole + 1).toBool() || m_terminalCheckbox->isChecked();
     if (inTerminal) {
-        bool ok = TerminalLauncher::launchDetached(command);
+        bool ok = TerminalLauncher::launchDetached(prog_args);
         if (!ok) {
             QMessageBox::about(
               this, tr("Error"), tr("Unable to launch in terminal."));
         }
     } else {
-        QProcess::startDetached(app_name, { m_tempFile });
+        QFileInfo fi(tempFilePath);
+        QString workingDir = fi.absolutePath();
+        prog_args.removeAt(0); // strip program name out
+        QProcess::startDetached(app_name, prog_args, workingDir);
     }
     if (!m_keepOpen) {
         close();
@@ -132,7 +191,9 @@ void AppLauncherWidget::searchChanged(const QString& text)
         m_tabWidget->hide();
         m_filterList->show();
         m_filterList->clear();
-        QRegExp regexp(text, Qt::CaseInsensitive, QRegExp::Wildcard);
+        const QRegularExpression regexp(
+          QRegularExpression::wildcardToRegularExpression("*" + text + "*"),
+          QRegularExpression::CaseInsensitiveOption);
         QVector<DesktopAppData> apps;
 
         for (auto const& i : catIconNames.toStdMap()) {
@@ -166,14 +227,23 @@ void AppLauncherWidget::initListWidget()
             continue;
         }
 
-        QListWidget* itemsWidget = new QListWidget();
+        auto* itemsWidget = new QListWidget();
         configureListView(itemsWidget);
 
         const QVector<DesktopAppData>& appList = m_appsMap[cat];
         addAppsToListWidget(itemsWidget, appList);
 
+#if defined(Q_OS_WIN)
+        QColor background = this->palette().window().color();
+        bool isDark = ColorUtils::colorIsDark(background);
+        QString modifier =
+          isDark ? PathInfo::whiteIconPath() : PathInfo::blackIconPath();
+        m_tabWidget->addTab(
+          itemsWidget, QIcon(modifier + iconName), QLatin1String(""));
+#else
         m_tabWidget->addTab(
           itemsWidget, QIcon::fromTheme(iconName), QLatin1String(""));
+#endif
         m_tabWidget->setTabToolTip(m_tabWidget->count(), cat);
         if (cat == QLatin1String("Graphics")) {
             m_tabWidget->setCurrentIndex(m_tabWidget->count() - 1);
@@ -202,18 +272,21 @@ void AppLauncherWidget::initAppMap()
     QStringList multimediaNames;
     multimediaNames << QStringLiteral("AudioVideo") << QStringLiteral("Audio")
                     << QStringLiteral("Video");
-    for (const QString& name : multimediaNames) {
+    for (const QString& name : std::as_const(multimediaNames)) {
         if (!m_appsMap.contains(name)) {
             continue;
         }
-        for (auto i : m_appsMap[name]) {
+        for (const auto& i : m_appsMap[name]) {
             if (!multimediaList.contains(i)) {
                 multimediaList.append(i);
             }
         }
         m_appsMap.remove(name);
     }
-    m_appsMap.insert(QStringLiteral("Multimedia"), multimediaList);
+
+    if (!multimediaList.isEmpty()) {
+        m_appsMap.insert(QStringLiteral("Multimedia"), multimediaList);
+    }
 }
 
 void AppLauncherWidget::configureListView(QListWidget* widget)
@@ -233,7 +306,7 @@ void AppLauncherWidget::addAppsToListWidget(
   const QVector<DesktopAppData>& appList)
 {
     for (const DesktopAppData& app : appList) {
-        QListWidgetItem* buttonItem = new QListWidgetItem(widget);
+        auto* buttonItem = new QListWidgetItem(widget);
         buttonItem->setData(Qt::DecorationRole, app.icon);
         buttonItem->setData(Qt::DisplayRole, app.name);
         buttonItem->setData(Qt::UserRole, app.exec);
@@ -245,5 +318,25 @@ void AppLauncherWidget::addAppsToListWidget(
         buttonItem->setIcon(app.icon);
         buttonItem->setText(app.name);
         buttonItem->setToolTip(app.description);
+    }
+}
+
+void AppLauncherWidget::keyPressEvent(QKeyEvent* keyEvent)
+{
+    if (keyEvent->key() == Qt::Key_Escape) {
+        close();
+    } else if (keyEvent->key() == Qt::Key_Return) {
+        auto* widget = (QListWidget*)m_tabWidget->currentWidget();
+        if (m_filterList->isVisible())
+            widget = m_filterList;
+        auto* item = widget->currentItem();
+        if (item == nullptr) {
+            item = widget->item(0);
+            widget->setCurrentItem(item);
+        }
+        QModelIndex const idx = widget->currentIndex();
+        AppLauncherWidget::launch(idx);
+    } else {
+        QWidget::keyPressEvent(keyEvent);
     }
 }

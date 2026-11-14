@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2017-2019 Alejandro Sirgo Rica & Contributors
 
 #include "exittool.h"
+
 #include <QPainter>
 
 ExitTool::ExitTool(QObject* parent)
@@ -23,9 +24,9 @@ QString ExitTool::name() const
     return tr("Exit");
 }
 
-ToolType ExitTool::nameID() const
+CaptureTool::Type ExitTool::type() const
 {
-    return ToolType::EXIT;
+    return CaptureTool::TYPE_EXIT;
 }
 
 QString ExitTool::description() const
@@ -38,7 +39,7 @@ CaptureTool* ExitTool::copy(QObject* parent)
     return new ExitTool(parent);
 }
 
-void ExitTool::pressed(const CaptureContext& context)
+void ExitTool::pressed(CaptureContext& context)
 {
     Q_UNUSED(context)
     emit requestAction(REQ_CLOSE_GUI);

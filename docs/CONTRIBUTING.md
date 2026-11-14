@@ -42,7 +42,6 @@ For small fixes or incremental improvements simply fork the repo and follow the 
 
 After reporting you should aim to answer questions or clarifications as this helps pinpoint the cause of the issue.
 
-### Donations
+## Donations
 
-I improve Flameshot in my free time because I want to create something good for everyone to use.
-If you want you can donate some bucks [here](https://www.paypal.me/lupoDharkael).
+Please refer to [the donation page on website]() for details, but as a brief recap, Flameshot does **not** accept financial donations, but we encourage you to put code bounty on the platform of your choice on the issues you like to be addressed.

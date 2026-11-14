@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "src/tools/abstractpathtool.h"
+#include "tools/abstractpathtool.h"
 
 class PencilTool : public AbstractPathTool
 {
@@ -22,9 +22,9 @@ public:
                            const CaptureContext& context) override;
 
 protected:
-    ToolType nameID() const override;
+    CaptureTool::Type type() const override;
 
 public slots:
     void drawStart(const CaptureContext& context) override;
-    void pressed(const CaptureContext& context) override;
+    void pressed(CaptureContext& context) override;
 };

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "src/tools/abstracttwopointtool.h"
+#include "tools/abstracttwopointtool.h"
 
 class SelectionTool : public AbstractTwoPointTool
 {
@@ -21,8 +21,8 @@ public:
     void process(QPainter& painter, const QPixmap& pixmap) override;
 
 protected:
-    ToolType nameID() const override;
+    CaptureTool::Type type() const override;
 
 public slots:
-    void pressed(const CaptureContext& context) override;
+    void pressed(CaptureContext& context) override;
 };

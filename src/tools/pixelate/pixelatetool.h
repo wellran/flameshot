@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "src/tools/abstracttwopointtool.h"
+#include "tools/abstracttwopointtool.h"
 
 class PixelateTool : public AbstractTwoPointTool
 {
@@ -14,17 +14,17 @@ public:
     QIcon icon(const QColor& background, bool inEditor) const override;
     QString name() const override;
     QString description() const override;
+    QRect boundingRect() const override;
 
     CaptureTool* copy(QObject* parent = nullptr) override;
     void process(QPainter& painter, const QPixmap& pixmap) override;
     void drawSearchArea(QPainter& painter, const QPixmap& pixmap) override;
     void paintMousePreview(QPainter& painter,
                            const CaptureContext& context) override;
-    void drawObjectSelection(QPainter& painter) override;
 
 protected:
-    ToolType nameID() const override;
+    CaptureTool::Type type() const override;
 
 public slots:
-    void pressed(const CaptureContext& context) override;
+    void pressed(CaptureContext& context) override;
 };

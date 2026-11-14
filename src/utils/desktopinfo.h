@@ -14,11 +14,14 @@ public:
     {
         GNOME,
         KDE,
+        COSMIC,
         OTHER,
-        SWAY
+        QTILE,
+        WLROOTS,
+        HYPRLAND
     };
 
-    bool waylandDectected();
+    bool waylandDetected();
     WM windowManager();
 
 private:

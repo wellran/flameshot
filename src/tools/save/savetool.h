@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "src/tools/abstractactiontool.h"
+#include "tools/abstractactiontool.h"
 
 class SaveTool : public AbstractActionTool
 {
@@ -20,8 +20,8 @@ public:
     CaptureTool* copy(QObject* parent = nullptr) override;
 
 protected:
-    ToolType nameID() const override;
+    CaptureTool::Type type() const override;
 
 public slots:
-    void pressed(const CaptureContext& context) override;
+    void pressed(CaptureContext& context) override;
 };

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2017-2019 Alejandro Sirgo Rica & Contributors
 
 #include "linetool.h"
+
 #include <QPainter>
 
 LineTool::LineTool(QObject* parent)
@@ -22,9 +23,9 @@ QString LineTool::name() const
     return tr("Line");
 }
 
-ToolType LineTool::nameID() const
+CaptureTool::Type LineTool::type() const
 {
-    return ToolType::LINE;
+    return CaptureTool::TYPE_DRAWER;
 }
 
 QString LineTool::description() const
@@ -42,11 +43,11 @@ CaptureTool* LineTool::copy(QObject* parent)
 void LineTool::process(QPainter& painter, const QPixmap& pixmap)
 {
     Q_UNUSED(pixmap)
-    painter.setPen(QPen(color(), thickness()));
+    painter.setPen(QPen(color(), size()));
     painter.drawLine(points().first, points().second);
 }
 
-void LineTool::pressed(const CaptureContext& context)
+void LineTool::pressed(CaptureContext& context)
 {
     Q_UNUSED(context)
 }

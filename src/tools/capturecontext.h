@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "core/capturerequest.h"
+
 #include <QPainter>
 #include <QPixmap>
 #include <QPoint>
@@ -24,10 +26,13 @@ struct CaptureContext
     QPoint widgetOffset;
     // Mouse position inside the widget
     QPoint mousePos;
-    // Value of the desired thickness
-    int thickness;
+    // Size of the active tool
+    int toolSize;
+    // Current circle count
+    int circleCount;
     // Mode of the capture widget
     bool fullscreen;
+    CaptureRequest request = CaptureRequest::GRAPHICAL_MODE;
 
     QPixmap selectedScreenshotArea() const;
 };
